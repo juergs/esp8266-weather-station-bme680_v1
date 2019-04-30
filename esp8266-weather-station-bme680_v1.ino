@@ -19,7 +19,9 @@ See more at https://blog.squix.org
             https://github.com/ThingPulse/minigrafx/blob/master/src/MiniGrafx.h
             https://arduinojson.org/v6/api/jsondocument/
             https://www.arduinoslovakia.eu/blog/2019/2/esp8266---suborovy-system-spiffs?lang=en
-            
+            Colors: https://github.com/ThingPulse/minigrafx/blob/master/src/ILI9341_SPI.h
+            https://www.arduino.cc/en/Tutorial/StringToInt
+                        
 Aenderungen:  31.3.2019_js: Anpassungen an BME680 begonnen.
 Workaround: TouchControllerWS::getPoint()   invert Xpos for touch.
 
@@ -140,35 +142,35 @@ Workaround: TouchControllerWS::getPoint()   invert Xpos for touch.
   void calibrationCallback(int16_t x, int16_t y);
   CalibrationCallback calibration = &calibrationCallback;
    
-  unsigned long   prevBme680Millis  = millis();           // counter main loop for BME 680
-  unsigned long   intervalBme680    = 10000;              // 10 sec update interval default
+  unsigned long   prevBme680Millis    = millis();           // counter main loop for BME 680
+  unsigned long   intervalBme680      = 10000;              // 10 sec update interval default
   float           resFiltered;                            // low pass
-  float           aF = 0;
-  float           tVoc = 0;
-  bool            bme680VocValid = false;                 // true if filter is initialized, ramp-up after start
+  float           aF                  = 0;
+  float           tVoc                = 0;
+  bool            bme680VocValid      = false;                 // true if filter is initialized, ramp-up after start
   char            bme680Msg[128];                         // payload
   
   //--- automatic baseline correction
-  uint32_t        bme680_baseC = 0;                  // highest adjusted r (lowest voc) in current time period
-  float           bme680_baseH = 0;                     // abs hum (g/m3)
+  uint32_t        bme680_baseC        = 0;                  // highest adjusted r (lowest voc) in current time period
+  float           bme680_baseH        = 0;                     // abs hum (g/m3)
   unsigned long   prevBme680AbcMillis = 0;      // ts of last save to nv 
-  unsigned long   intervalBme680NV = 604800000; // 7 days of ms
-  uint8_t         bDelay = 0;    
+  unsigned long   intervalBme680NV    = 604800000;  // 7 days of ms
+  uint8_t         bDelay              = 0;    
   
   //--- TODO: clear defaults
   struct 
   { 
-    float         t_offset  = -.5;                 // offset temperature sensor
-    float         h_offset  = 1.5;                 // offset humitidy sensor
-    uint32_t      vocBaseR  = 0;                   // base value for VOC resistance clean air, abc 
-    uint32_t      vocBaseC  = 0;                   // base value for VOC resistance clean air, abc  
-    float         vocHum    = 0;                   // reserved, abc
-    uint32_t      signature = 0x49415143;          // 'IAQC'
+    float         t_offset            = -.5;                 // offset temperature sensor
+    float         h_offset            = 1.5;                 // offset humitidy sensor
+    uint32_t      vocBaseR            = 0;                   // base value for VOC resistance clean air, abc 
+    uint32_t      vocBaseC            = 0;                   // base value for VOC resistance clean air, abc  
+    float         vocHum              = 0;                   // reserved, abc
+    uint32_t      signature           = 0x49415143;          // 'IAQC'
   } preload, param;     //--- stable new baseline counter (avoid short-term noise)    
 
   //--- global
-  float       humidity    = 0.0;    
-  float       temperature = 0.0;    
+  float       humidity                = 0.0;    
+  float       temperature             = 0.0;    
 
   typedef struct 
   { 
@@ -184,67 +186,66 @@ Workaround: TouchControllerWS::getPoint()   invert Xpos for touch.
   
   GDATA_TYP gdata;  
   
-  //--- declare routine to draw indoor data screen
-  void      readConfig();
-  void      writeConfig();
-  String    form_input(const String& name, const String& info, const String& value, const int length);
-  String    form_checkbox(const String& name, const String& info, const bool checked);
-  String    line_from_value(const String& name, const String& value);
-  String    form_select_frame();
-  void      notFound(AsyncWebServerRequest *request);
-  void      configModeCallback (AsyncWiFiManager *myWiFiManager);
-  void      drawIndoorData();
-  void      ldr();            //--- get ambient illuminance
-  void      updateData();
-  void      drawProgress(uint8_t percentage, String text);
-  void      drawTime();
-  void      drawWifiQuality();
-  void      drawCurrentWeather();
-  void      drawForecast();
-  void      drawForecastDetail(uint16_t x, uint16_t y, uint8_t dayIndex);
-  void      drawAstronomy();
-  void      drawCurrentWeatherDetail();
-  void      drawLabelValue(uint8_t line, String label, String value);
-  void      drawForecastTable(uint8_t start);
-  void      drawAbout();
-  void      drawSeparator(uint16_t y);
-  String    getTime(time_t *timestamp);
+  //--- prototypes 
+  void          readConfig();
+  void          writeConfig();
+  String        form_input(const String& name, const String& info, const String& value, const int length);
+  String        form_checkbox(const String& name, const String& info, const bool checked);
+  String        line_from_value(const String& name, const String& value);
+  String        form_select_frame();
+  void          notFound(AsyncWebServerRequest *request);
+  void          configModeCallback (AsyncWiFiManager *myWiFiManager);
+  void          drawIndoorData();
+  void          ldr();            //--- get ambient illuminance
+  void          updateData();
+  void          drawProgress(uint8_t percentage, String text);
+  void          drawTime();
+  void          drawWifiQuality();
+  void          drawCurrentWeather();
+  void          drawForecast();
+  void          drawForecastDetail(uint16_t x, uint16_t y, uint8_t dayIndex);
+  void          drawAstronomy();
+  void          drawCurrentWeatherDetail();
+  void          drawLabelValue(uint8_t line, String label, String value);
+  void          drawForecastTable(uint8_t start);
+  void          drawAbout();
+  void          drawSeparator(uint16_t y);
+  String        getTime(time_t *timestamp);
   const char*   getMeteoconIconFromProgmem(String iconText);
   const char*   getMiniMeteoconIconFromProgmem(String iconText);
   const char*   PARAM_MESSAGE = "message";
-  void      drawForecast1(MiniGrafx *display, CarouselState* state, int16_t x, int16_t y);
-  void      drawForecast2(MiniGrafx *display, CarouselState* state, int16_t x, int16_t y);  
-  void      drawForecast3(MiniGrafx *display, CarouselState* state, int16_t x, int16_t y);
-  float     absHum(float temp, float hum);
-  float     dewPoint(float temp, float hum);
-  void      getBme680Readings();
-  uint32_t  bme680Abc(uint32_t r, float a);  
+  void          drawForecast1(MiniGrafx *display, CarouselState* state, int16_t x, int16_t y);
+  void          drawForecast2(MiniGrafx *display, CarouselState* state, int16_t x, int16_t y);  
+  void          drawForecast3(MiniGrafx *display, CarouselState* state, int16_t x, int16_t y);
+  float         absHum(float temp, float hum);
+  float         dewPoint(float temp, float hum);
+  void          getBme680Readings();
+  uint32_t      bme680Abc(uint32_t r, float a);  
 
   FrameCallback frames_1[] = { drawForecast1 };
   FrameCallback frames_2[] = { drawForecast1, drawForecast2 };
   FrameCallback frames_3[] = { drawForecast1, drawForecast3, drawForecast2 };
 
   //--- how many different screens do we have?
-  int       screenCount = 6;   //--- (0..5)
-  long      lastDownloadUpdate = millis();
+  int         	screenCount = 6;   //--- (0..5)
+  long          lastDownloadUpdate = millis();
 
-  String    moonAgeImage = "";
-  uint8_t   moonAge = 0;
-  uint16_t  screen = 0;
-  long      timerPress;
-  bool      canBtnPress;
-  time_t    dstOffset = 0;
-  bool      config_needs_write = false;
+  String        moonAgeImage = "";
+  uint8_t       moonAge = 0;
+  uint16_t      screen = 0;
+  long          timerPress;
+  bool          canBtnPress;
+  time_t        dstOffset = 0;
+  bool          config_needs_write = false;
 
-  long      lastDrew = 0;
-  bool      btnClick;
-  uint8_t   MAX_TOUCHPOINTS = 10;
-  TS_Point  points[10];
-  uint8_t   currentTouchPoint = 0;
+  long          lastDrew = 0;
+  bool          btnClick;
+  uint8_t       MAX_TOUCHPOINTS = 10;
+  TS_Point      points[10];
+  uint8_t       currentTouchPoint = 0;
 
- //----------------------------------------------------------------------
- 
-// simple function to scan for I2C devices on the bus
+//----------------------------------------------------------------------
+//--- simple function to scan for I2C devices on the bus
 void I2C_scan() 
 {
     // scan for i2c devices
@@ -286,246 +287,235 @@ void I2C_scan()
     DEBUG_PRINT("done\n");
 }
   //----------------------------------------------------------------------
-  void spiff_info()
-  {
-    FSInfo fs_info;
-    SPIFFS.info(fs_info);
-    
-    DEBUG_OUT("fs_info.totalBytes = ");
-    DEBUG_PRINT(fs_info.totalBytes);
-    DEBUG_OUT("fs_info.usedBytes = ");
-    DEBUG_PRINT(fs_info.usedBytes);
-    DEBUG_OUT("fs_info.blockSize = ");
-    DEBUG_PRINT(fs_info.blockSize);
-    DEBUG_OUT("fs_info.pageSize = ");
-    DEBUG_PRINT(fs_info.pageSize);
-    DEBUG_OUT("fs_info.maxOpenFiles = ");
-    DEBUG_PRINT(fs_info.maxOpenFiles);
-    DEBUG_OUT("fs_info.maxPathLength = ");
-    DEBUG_PRINT(fs_info.maxPathLength);
-    DEBUG_PRINT(""); 
-  }
-  //----------------------------------------------------------------------
-  void sleep(uint32_t t_ms)
-  {
-      delay(t_ms);
-      yield(); 
-  }
+void spiff_info()
+{
+  FSInfo fs_info;
+  SPIFFS.info(fs_info);
+  
+  DEBUG_OUT("fs_info.totalBytes = ");
+  DEBUG_PRINT(fs_info.totalBytes);
+  DEBUG_OUT("fs_info.usedBytes = ");
+  DEBUG_PRINT(fs_info.usedBytes);
+  DEBUG_OUT("fs_info.blockSize = ");
+  DEBUG_PRINT(fs_info.blockSize);
+  DEBUG_OUT("fs_info.pageSize = ");
+  DEBUG_PRINT(fs_info.pageSize);
+  DEBUG_OUT("fs_info.maxOpenFiles = ");
+  DEBUG_PRINT(fs_info.maxOpenFiles);
+  DEBUG_OUT("fs_info.maxPathLength = ");
+  DEBUG_PRINT(fs_info.maxPathLength);
+  DEBUG_PRINT(""); 
+}
+//----------------------------------------------------------------------
+void sleep(uint32_t t_ms)
+{
+    delay(t_ms);
+    yield(); 
+}
 ///////////////////////////////////////////////////////////////////////////
 // BME 680 
 ///////////////////////////////////////////////////////////////////////////
-  float absHum(float temp, float hum) 
+float absHum(float temp, float hum) 
+{
+  double sdd, dd;
+  sdd=6.1078 * pow(10,(7.5*temp)/(237.3+temp));
+  dd=hum/100.0*sdd;
+  return (float)216.687*dd/(273.15+temp);
+};
+//----------------------------------------------------------------------
+float dewPoint(float temp, float hum) 
+{
+  double A = (hum/100) * pow(10, (7.5*temp / (237+temp)));
+  return (float) 237*log10(A)/(7.5-log10(A));
+};
+//----------------------------------------------------------------------
+int64_t get_timestamp_us()
+{
+    return (int64_t)millis() * 1000;
+}
+//----------------------------------------------------------------------
+int64_t serial_timestamp()
+{
+    //--- a jumper to GND on D10 does the job, when needed! 
+    /* if (digitalRead(PIN_ENABLE_TIMESTAMP_IN_OUTPUT) == LOW){    */
+        DEBUG_OUT("["); DEBUG_OUT(get_timestamp_us() / 1e6); DEBUG_OUT("] ");
+    //}
+}
+//----------------------------------------------------------------------
+void getBme680Readings() 
+{
+  prevBme680Millis  = millis(); // counter main loop for BME 680
+  
+  if (! bme680.performReading()) 
   {
-    double sdd, dd;
-    sdd=6.1078 * pow(10,(7.5*temp)/(237.3+temp));
-    dd=hum/100.0*sdd;
-    return (float)216.687*dd/(273.15+temp);
+    DEBUG_PRINT("BME680-I2C: Failed to perform reading :(");
+    return;
   };
-  //----------------------------------------------------------------------
-  float dewPoint(float temp, float hum) 
+
+  //DEBUG_OUT( get_timestamp_us() ); 
+  //DEBUG_OUT("  "); 
+  serial_timestamp(); 
+  DEBUG_OUT("  ");
+  DEBUG_OUT("Temperature = ");
+  DEBUG_OUT(bme680.temperature);
+  DEBUG_OUT(" *C  ");
+
+  DEBUG_OUT("Pressure = ");
+  DEBUG_OUT(bme680.pressure / 100.0);
+  DEBUG_OUT(" hPa  ");
+  
+  DEBUG_OUT("Humidity = ");
+  DEBUG_OUT(bme680.humidity);
+  DEBUG_OUT(" %  ");
+  
+  DEBUG_OUT("Gas = ");
+  DEBUG_OUT(bme680.gas_resistance / 1000.0);
+  DEBUG_OUT(" KOhms  ");
+
+  #define SEALEVELPRESSURE_HPA (1013.25)
+  DEBUG_OUT("Approx. Altitude = ");
+  DEBUG_OUT(bme680.readAltitude(SEALEVELPRESSURE_HPA));
+  DEBUG_OUT(" m  ");
+  
+  //DEBUG_PRINT();
+
+  char str_temp[6];
+  char str_hum[6];
+  char str_absHum[6];
+  char str_dewPoint[6];
+  char str_pressure[16];
+  char str_altitude[8];
+  char str_tVoc[8];
+  char str_gas[8];
+
+  float     t = bme680.temperature + param.t_offset;
+  float     h = bme680.humidity + param.h_offset;
+  float     a = absHum(t, h);
+  aF = (aF == 0 || a < aF)?a:aF + 0.2 * (a - aF);
+  float     d = dewPoint(t, h);
+  float     p = bme680.pressure /100.0F;
+  uint32_t  r = bme680.gas_resistance; // raw R VOC
+
+  if (!bme680VocValid )
   {
-    double A = (hum/100) * pow(10, (7.5*temp / (237+temp)));
-    return (float) 237*log10(A)/(7.5-log10(A));
-  };
-  //----------------------------------------------------------------------
-  int64_t get_timestamp_us()
-  {
-      return (int64_t)millis() * 1000;
-  }
-  //----------------------------------------------------------------------
-  int64_t serial_timestamp()
-  {
-      //--- a jumper to GND on D10 does the job, when needed! 
-     /* if (digitalRead(PIN_ENABLE_TIMESTAMP_IN_OUTPUT) == LOW){    */
-          DEBUG_OUT("["); DEBUG_OUT(get_timestamp_us() / 1e6); DEBUG_OUT("] ");
-      //}
-  }
-  //----------------------------------------------------------------------
-  void getBme680Readings() 
-  {
-    prevBme680Millis  = millis(); // counter main loop for BME 680
-    
-    if (! bme680.performReading()) 
-    {
-      DEBUG_PRINT("BME680-I2C: Failed to perform reading :(");
-      return;
-    };
-
-    //DEBUG_OUT( get_timestamp_us() ); 
-    //DEBUG_OUT("  "); 
-    serial_timestamp(); 
-    DEBUG_OUT("  ");
-    DEBUG_OUT("Temperature = ");
-    DEBUG_OUT(bme680.temperature);
-    DEBUG_OUT(" *C  ");
-
-    DEBUG_OUT("Pressure = ");
-    DEBUG_OUT(bme680.pressure / 100.0);
-    DEBUG_OUT(" hPa  ");
-    
-    DEBUG_OUT("Humidity = ");
-    DEBUG_OUT(bme680.humidity);
-    DEBUG_OUT(" %  ");
-    
-    DEBUG_OUT("Gas = ");
-    DEBUG_OUT(bme680.gas_resistance / 1000.0);
-    DEBUG_OUT(" KOhms  ");
-
-    #define SEALEVELPRESSURE_HPA (1013.25)
-    DEBUG_OUT("Approx. Altitude = ");
-    DEBUG_OUT(bme680.readAltitude(SEALEVELPRESSURE_HPA));
-    DEBUG_OUT(" m  ");
-    
-    //DEBUG_PRINT();
-
-    char str_temp[6];
-    char str_hum[6];
-    char str_absHum[6];
-    char str_dewPoint[6];
-    char str_pressure[16];
-    char str_altitude[8];
-    char str_tVoc[8];
-    char str_gas[8];
-
-    float     t = bme680.temperature + param.t_offset;
-    float     h = bme680.humidity + param.h_offset;
-    float     a = absHum(t, h);
-    aF = (aF == 0 || a < aF)?a:aF + 0.2 * (a - aF);
-    float     d = dewPoint(t, h);
-    float     p = bme680.pressure /100.0F;
-    uint32_t  r = bme680.gas_resistance; // raw R VOC
-
-    if (!bme680VocValid )
-    {
-      //--- get first readings without tvoc              
-      dtostrf(t, 4, 2, str_temp);
-      dtostrf(h, 4, 2, str_hum);
-      dtostrf(a, 4, 2, str_absHum);
-      dtostrf(d, 4, 2, str_dewPoint);
-      dtostrf(p, 3, 1, str_pressure);
-      dtostrf(r, 3, 1, str_gas);   
-
-      gdata.temperature = str_temp;
-      gdata.humidity    = str_hum;
-      gdata.abshum      = str_absHum;
-      gdata.dewpoint    = str_dewPoint;
-      gdata.pressure    = str_pressure;
-      gdata.gas         = str_gas;      
-      gdata.tvoc        = "0";  //--- not enough data yet
-      gdata.altitude    = "-.-"; 
-    }
-
-// drawBME680Data(gdata.temperature, gdata.humidity,gdata.pressure, gdata.altitude,gdata.tvoc); 
-
-    if (r == 0) return;      //--- first reading !=0 accepted, 0 is invalid
-    
-    uint32_t base = bme680Abc(r, a);       // update base resistance 
-    
-    if (!bme680VocValid && (millis() > 300000)) 
-    { 
-      //--- allow 300 sec warm-up for stable voc resistance (300000ms)
-      resFiltered = r;        // preload low pass filter
-      bme680VocValid = true;
-    };
-
-    DEBUG_PRINT(""); 
-    
-    if (!bme680VocValid ) return;
-    
-    resFiltered += 0.1 * (r - resFiltered);
-    
-    //float ratio = (float)base / (resFiltered * a * 7.0F);   // filter removed
-    float ratio = (float)base / (r * aF * 7.0F);
-    float tV = (1250 * log(ratio)) + 125;                     // approximation
-    tVoc = (tVoc == 0)?tV:tVoc + 0.1 * (tV - tVoc);
-        
+    //--- get first readings without tvoc              
     dtostrf(t, 4, 2, str_temp);
     dtostrf(h, 4, 2, str_hum);
     dtostrf(a, 4, 2, str_absHum);
     dtostrf(d, 4, 2, str_dewPoint);
     dtostrf(p, 3, 1, str_pressure);
-    dtostrf(r, 3, 1, str_gas);
-    dtostrf(tVoc, 1, 0, str_tVoc); 
-
-    serial_timestamp(); 
-    DEBUG_OUT ("Taupunkt: "); DEBUG_OUT (str_dewPoint);
-    DEBUG_OUT ("  ");         
-    DEBUG_OUT ("tVOC: "); DEBUG_PRINT (str_tVoc);
+    dtostrf(r, 3, 1, str_gas);   
 
     gdata.temperature = str_temp;
     gdata.humidity    = str_hum;
     gdata.abshum      = str_absHum;
     gdata.dewpoint    = str_dewPoint;
     gdata.pressure    = str_pressure;
-    gdata.gas         = str_gas;
-    gdata.tvoc        = String(tVoc, 0); 
-    gdata.altitude = "0"; 
-    
+    gdata.gas         = str_gas;      
+    gdata.tvoc        = "0";  //--- not enough data yet
+    gdata.altitude    = "-.-"; 
+  }
 
-    serial_timestamp(); 
-    DEBUG_OUT ("Taupunkt: ");  DEBUG_OUT (str_dewPoint); DEBUG_OUT ("  ");
-    DEBUG_OUT ("tVOC: "); DEBUG_PRINT (str_tVoc);
-
-    String str_press_val = String(p,2); 
-
-//    drawBME680Data(str_temp, str_hum, str_press_val, "0", str_tVoc); 
-//    drawBME680Data(gdata.temperature, gdata.humidity,gdata.pressure, gdata.altitude,gdata.tvoc); 
-    
-    //--- DEBUG
-    char str_filtered[16];
-    dtostrf(resFiltered, 4, 3, str_filtered);
-    char str_ratio[16];
-    dtostrf(ratio, 4, 4, str_ratio);
-    
-    /* UDP Message to fhem
-    snprintf(bme680Msg
-           , sizeof(bme680Msg)
-           , "F:THPV;T:%s;H:%s;AH:%s;D:%s;P:%s;V:%s;R:%lu;DB:%lu;DF:%s;DR:%s;"
-           , str_temp
-           , str_hum
-           , str_absHum
-           , str_dewPoint
-           , str_pressure
-           , str_tVoc
-           , r
-           , base
-           , str_filtered
-           , str_ratio);
-           
-    DEBUG_PRINT(bme680Msg);    
-    */
-    DEBUG_PRINT("BME680-Reading done.");
-  };  
-//----------------------------------------------------------------------
-  uint32_t bme680Abc(uint32_t r, float a) 
-  {   
-    //--- automatic baseline correction
-    uint32_t b = r * a * 7.0F;
-    if (b > bme680_baseC && bDelay > 5) 
-    {     
-      // ensure that new baseC is stable for at least >5*10sec (clean air)
-      bme680_baseC = b;
-      bme680_baseH = a;
-    } else if (b > bme680_baseC) 
-    {
-      bDelay++;
-      //return b;
-    } else 
-    {
-      bDelay = 0;
-    };
-
-    //--- store baseline to nv
-    unsigned long currentMillis = millis();
-    if (currentMillis - prevBme680AbcMillis > intervalBme680NV) 
-    {
-      //    prevBme680AbcMillis = currentMillis;    
-      //    //---store baseline
-      //    param.vocBase = bme680CurrentHigh;
-      //    bme680CurrentHigh = 0;
-    };
-    return (param.vocBaseC > bme680_baseC)?param.vocBaseC:bme680_baseC;
+  if (r == 0) return;      //--- first reading !=0 accepted, 0 is invalid
+  
+  uint32_t base = bme680Abc(r, a);       // update base resistance 
+  
+  if (!bme680VocValid && (millis() > 300000)) 
+  { 
+    //--- allow 300 sec warm-up for stable voc resistance (300000ms)
+    resFiltered = r;        // preload low pass filter
+    bme680VocValid = true;
   };
+
+  DEBUG_PRINT(""); 
+  
+  if (!bme680VocValid ) return;
+  
+  resFiltered += 0.1 * (r - resFiltered);
+  
+  //float ratio = (float)base / (resFiltered * a * 7.0F);   // filter removed
+  float ratio = (float)base / (r * aF * 7.0F);
+  float tV = (1250 * log(ratio)) + 125;                     // approximation
+  tVoc = (tVoc == 0)?tV:tVoc + 0.1 * (tV - tVoc);
+      
+  dtostrf(t, 4, 2, str_temp);
+  dtostrf(h, 4, 2, str_hum);
+  dtostrf(a, 4, 2, str_absHum);
+  dtostrf(d, 4, 2, str_dewPoint);
+  dtostrf(p, 3, 1, str_pressure);
+  dtostrf(r, 3, 1, str_gas);
+  dtostrf(tVoc, 1, 0, str_tVoc); 
+    
+  String str_press_val = String(p,2); 
+  
+  gdata.temperature = str_temp;
+  gdata.humidity    = str_hum;
+  gdata.abshum      = str_absHum;
+  gdata.dewpoint    = str_dewPoint;
+  gdata.pressure    = str_press_val;
+  gdata.gas         = str_gas;
+  gdata.tvoc        = String(tVoc, 0); 
+  gdata.altitude    = "0"; 
+  
+  serial_timestamp(); 
+  DEBUG_OUT ("Taupunkt: ");  DEBUG_OUT (str_dewPoint); DEBUG_OUT ("  ");
+  DEBUG_OUT ("tVOC: "); DEBUG_PRINT (str_tVoc);
+
+  //--- DEBUG
+  char str_filtered[16];
+  dtostrf(resFiltered, 4, 3, str_filtered);
+  char str_ratio[16];
+  dtostrf(ratio, 4, 4, str_ratio);
+  
+  /* prepare to send UDP-message to fhem
+  snprintf(bme680Msg
+          , sizeof(bme680Msg)
+          , "F:THPV;T:%s;H:%s;AH:%s;D:%s;P:%s;V:%s;R:%lu;DB:%lu;DF:%s;DR:%s;"
+          , str_temp
+          , str_hum
+          , str_absHum
+          , str_dewPoint
+          , str_pressure
+          , str_tVoc
+          , r
+          , base
+          , str_filtered
+          , str_ratio);
+          
+  DEBUG_PRINT(bme680Msg);    
+  */
+  DEBUG_PRINT("BME680-Reading done.");
+};  
+//----------------------------------------------------------------------
+uint32_t bme680Abc(uint32_t r, float a) 
+{   
+  //--- automatic baseline correction
+  uint32_t b = r * a * 7.0F;
+  if (b > bme680_baseC && bDelay > 5) 
+  {     
+    // ensure that new baseC is stable for at least >5*10sec (clean air)
+    bme680_baseC = b;
+    bme680_baseH = a;
+  } else if (b > bme680_baseC) 
+  {
+    bDelay++;
+    //return b;
+  } else 
+  {
+    bDelay = 0;
+  };
+
+  //--- store baseline to nv
+  unsigned long currentMillis = millis();
+  if (currentMillis - prevBme680AbcMillis > intervalBme680NV) 
+  {
+    //    prevBme680AbcMillis = currentMillis;    
+    //    //---store baseline
+    //    param.vocBase = bme680CurrentHigh;
+    //    bme680CurrentHigh = 0;
+  };
+  return (param.vocBaseC > bme680_baseC)?param.vocBaseC:bme680_baseC;
+};
 //----------------------------------------------------------------
 void setup() 
 {
@@ -1515,17 +1505,17 @@ void drawBME680Data(String temp, String hum, String press, String alt, String tv
   gfx.setFont(ArialRoundedMTBold_36);  
   switch (gdata.tvoc.toInt()) 
   {
-    case 0 ... 250:
+    case 0 ... 124:
       gfx.setColor(MINI_WHITE);
       break;
-    case  251 ... 499:
-      gfx.setColor(ILI9341_DARKGREEN);
+    case  125 ... 499:
+      gfx.setColor(MINI_YELLOW);
       break;
     case 500 ... 999: 
-      gfx.setColor(ILI9341_ORANGE);
+      gfx.setColor(MINI_BLUE);
       break;    
     case 1000 ... 10000:
-      gfx.setColor(ILI9341_RED);
+      gfx.setColor(MINI_BLUE);
     break;      
   }  
   gfx.setTextAlignment(TEXT_ALIGN_CENTER);  
