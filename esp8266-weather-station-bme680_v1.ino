@@ -16,6 +16,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 See more at https://blog.squix.org
+            https://github.com/ThingPulse/minigrafx/blob/master/src/MiniGrafx.h
             https://arduinojson.org/v6/api/jsondocument/
             https://www.arduinoslovakia.eu/blog/2019/2/esp8266---suborovy-system-spiffs?lang=en
             
@@ -67,28 +68,32 @@ Workaround: TouchControllerWS::getPoint()   invert Xpos for touch.
 #include "weathericons.h"
 #include <ESPAsyncWebServer.h>     //Local WebServer used to serve the configuration portal
 #include <ESPAsyncWiFiManager.h>   //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
-#include <Adafruit_BME680.h>   //--- Adafruit BME680 library  
+//--- include Adafruit lib, which could be found at Github
+#include <Adafruit_BME680.h>      //--- Adafruit BME680 library  
 //---------------------------------------------------------------------------------  
 //--- WEMOS D1 mini: Arduino Board Lolin/Wemos D1 R2 & mini
 //--- uncomment for Serial debugging statements
 #define DEBUG_SERIAL
 #ifdef DEBUG_SERIAL
-  #define DEBUG_BEGIN     Serial.begin(115200)
-  #define DEBUG_PRINT(x)  Serial.println(x)
-  #define DEBUG_OUT(y)    Serial.print(y) 
+  #define DEBUG_BEGIN       Serial.begin(115200)
+  #define DEBUG_PRINT(x)    Serial.println(x)
+  #define DEBUG_OUT(y)      Serial.print(y)
+  #define DEBUG_OUT2(x,y)   Serial.print(x,y) 
 #else
   #define DEBUG_PRINT(x) 
   #define DEBUG_OUT(x)
+  #define DEBUG_OUT2(x,y)
   #define DEBUG_BEGIN
 #endif
-#define MINI_BLACK  0
-#define MINI_WHITE  1
-#define MINI_YELLOW 2
-#define MINI_BLUE   3
-#define MAX_FORECASTS_DEF 12
- //--- include two Adafruit libs which could be found at Github
-#define HAS_BME680MCU   false
-#define HAS_BME680I2C   true
+
+#define MINI_BLACK          0
+#define MINI_WHITE          1
+#define MINI_YELLOW         2
+#define MINI_BLUE           3
+#define MAX_FORECASTS_DEF   12
+
+#define HAS_BME680MCU       false   //--- serial interfacing
+#define HAS_BME680I2C       true    //--- hard wired i2c interface, not spi 
  
 #if HAS_BME680MCU
   //--- TODO
@@ -107,14 +112,14 @@ Workaround: TouchControllerWS::getPoint()   invert Xpos for touch.
   int BITS_PER_PIXEL = 2;     // 2^2 =  4 colors
 
   //--- object instances
-  AsyncWebServer  server(80);
-  DNSServer       dns;
-  ILI9341_SPI     tft = ILI9341_SPI(TFT_CS, TFT_DC);
-  MiniGrafx       gfx   = MiniGrafx(&tft, BITS_PER_PIXEL, palette);
-  Carousel        carousel(&gfx, 0, 0, 240, 100);
+  AsyncWebServer              server(80);
+  DNSServer                   dns;
+  ILI9341_SPI                 tft = ILI9341_SPI(TFT_CS, TFT_DC);
+  MiniGrafx                   gfx   = MiniGrafx(&tft, BITS_PER_PIXEL, palette);
+  Carousel                    carousel(&gfx, 0, 0, 240, 100);
 
-  XPT2046_Touchscreen   ts(TOUCH_CS, TOUCH_IRQ);
-  TouchControllerWS     touchController(&ts);
+  XPT2046_Touchscreen         ts(TOUCH_CS, TOUCH_IRQ);
+  TouchControllerWS           touchController(&ts);
 
   OpenWeatherMapCurrentData   currentWeather;
   OpenWeatherMapForecastData  forecasts[MAX_FORECASTS_DEF];
@@ -153,18 +158,32 @@ Workaround: TouchControllerWS::getPoint()   invert Xpos for touch.
   //--- TODO: clear defaults
   struct 
   { 
-    float     t_offset  = -.5;                   // offset temperature sensor
-    float     h_offset  = 1.5;                   // offset humitidy sensor
-    uint32_t  vocBaseR  = 0;                  // base value for VOC resistance clean air, abc 
-    uint32_t  vocBaseC  = 0;                  // base value for VOC resistance clean air, abc  
-    float     vocHum    = 0;                       // reserved, abc
-    uint32_t  signature = 0x49415143;        // 'IAQC'
+    float         t_offset  = -.5;                 // offset temperature sensor
+    float         h_offset  = 1.5;                 // offset humitidy sensor
+    uint32_t      vocBaseR  = 0;                   // base value for VOC resistance clean air, abc 
+    uint32_t      vocBaseC  = 0;                   // base value for VOC resistance clean air, abc  
+    float         vocHum    = 0;                   // reserved, abc
+    uint32_t      signature = 0x49415143;          // 'IAQC'
   } preload, param;     //--- stable new baseline counter (avoid short-term noise)    
 
   //--- global
-  float     humidity    = 0.0;    //--- keep measured indoor humidity
-  float     temperature = 0.0;    //--- keep measured indoor temperature
+  float       humidity    = 0.0;    
+  float       temperature = 0.0;    
 
+  typedef struct 
+  { 
+    String  temperature = "";
+    String  humidity    = "";
+    String  abshum      = "";
+    String  pressure    = "";
+    String  tvoc        = "";    
+    String  dewpoint    = ""; 
+    String  gas         = "";
+    String  altitude    = "";      
+  } GDATA_TYP; 
+  
+  GDATA_TYP gdata;  
+  
   //--- declare routine to draw indoor data screen
   void      readConfig();
   void      writeConfig();
@@ -222,25 +241,68 @@ Workaround: TouchControllerWS::getPoint()   invert Xpos for touch.
   uint8_t   MAX_TOUCHPOINTS = 10;
   TS_Point  points[10];
   uint8_t   currentTouchPoint = 0;
-  
+
+ //----------------------------------------------------------------------
+ 
+// simple function to scan for I2C devices on the bus
+void I2C_scan() 
+{
+    // scan for i2c devices
+  byte error, address;
+  int nDevices;
+
+  DEBUG_PRINT(F("Scanning I2C..."));
+
+  nDevices = 0;
+  for(address = 1; address < 127; address++ ) 
+  {
+    // The i2c_scanner uses the return value of
+    // the Write.endTransmisstion to see if
+    // a device did acknowledge to the address.
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    if (error == 0)
+    {
+      DEBUG_OUT("I2C device found at address 0x");
+      if (address<16) 
+          DEBUG_OUT("0");
+      DEBUG_OUT2(address,HEX);
+      DEBUG_PRINT("  !");
+
+      nDevices++;
+    }
+    else if (error==4) 
+    {
+      DEBUG_OUT("Unknown error at address 0x");
+      if (address<16) 
+        DEBUG_OUT("0");
+      Serial.println(address,HEX);
+    }    
+  }
+  if (nDevices == 0)
+    DEBUG_PRINT("No I2C devices found\n");
+  else
+    DEBUG_PRINT("done\n");
+}
   //----------------------------------------------------------------------
   void spiff_info()
   {
     FSInfo fs_info;
     SPIFFS.info(fs_info);
     
-    Serial.print("fs_info.totalBytes = ");
-    Serial.println(fs_info.totalBytes);
-    Serial.print("fs_info.usedBytes = ");
-    Serial.println(fs_info.usedBytes);
-    Serial.print("fs_info.blockSize = ");
-    Serial.println(fs_info.blockSize);
-    Serial.print("fs_info.pageSize = ");
-    Serial.println(fs_info.pageSize);
-    Serial.print("fs_info.maxOpenFiles = ");
-    Serial.println(fs_info.maxOpenFiles);
-    Serial.print("fs_info.maxPathLength = ");
-    Serial.println(fs_info.maxPathLength);
+    DEBUG_OUT("fs_info.totalBytes = ");
+    DEBUG_PRINT(fs_info.totalBytes);
+    DEBUG_OUT("fs_info.usedBytes = ");
+    DEBUG_PRINT(fs_info.usedBytes);
+    DEBUG_OUT("fs_info.blockSize = ");
+    DEBUG_PRINT(fs_info.blockSize);
+    DEBUG_OUT("fs_info.pageSize = ");
+    DEBUG_PRINT(fs_info.pageSize);
+    DEBUG_OUT("fs_info.maxOpenFiles = ");
+    DEBUG_PRINT(fs_info.maxOpenFiles);
+    DEBUG_OUT("fs_info.maxPathLength = ");
+    DEBUG_PRINT(fs_info.maxPathLength);
     DEBUG_PRINT(""); 
   }
   //----------------------------------------------------------------------
@@ -274,11 +336,8 @@ Workaround: TouchControllerWS::getPoint()   invert Xpos for touch.
   int64_t serial_timestamp()
   {
       //--- a jumper to GND on D10 does the job, when needed! 
-     /* if (digitalRead(PIN_ENABLE_TIMESTAMP_IN_OUTPUT) == LOW)
-      {*/
-          Serial.print("[");
-          Serial.print(get_timestamp_us() / 1e6);
-          Serial.print("] ");
+     /* if (digitalRead(PIN_ENABLE_TIMESTAMP_IN_OUTPUT) == LOW){    */
+          DEBUG_OUT("["); DEBUG_OUT(get_timestamp_us() / 1e6); DEBUG_OUT("] ");
       //}
   }
   //----------------------------------------------------------------------
@@ -319,6 +378,15 @@ Workaround: TouchControllerWS::getPoint()   invert Xpos for touch.
     
     //DEBUG_PRINT();
 
+    char str_temp[6];
+    char str_hum[6];
+    char str_absHum[6];
+    char str_dewPoint[6];
+    char str_pressure[16];
+    char str_altitude[8];
+    char str_tVoc[8];
+    char str_gas[8];
+
     float     t = bme680.temperature + param.t_offset;
     float     h = bme680.humidity + param.h_offset;
     float     a = absHum(t, h);
@@ -326,8 +394,30 @@ Workaround: TouchControllerWS::getPoint()   invert Xpos for touch.
     float     d = dewPoint(t, h);
     float     p = bme680.pressure /100.0F;
     uint32_t  r = bme680.gas_resistance; // raw R VOC
-    
-    if (r == 0) return;      //--- first reading !=0 is invalid
+
+    if (!bme680VocValid )
+    {
+      //--- get first readings without tvoc              
+      dtostrf(t, 4, 2, str_temp);
+      dtostrf(h, 4, 2, str_hum);
+      dtostrf(a, 4, 2, str_absHum);
+      dtostrf(d, 4, 2, str_dewPoint);
+      dtostrf(p, 3, 1, str_pressure);
+      dtostrf(r, 3, 1, str_gas);   
+
+      gdata.temperature = str_temp;
+      gdata.humidity    = str_hum;
+      gdata.abshum      = str_absHum;
+      gdata.dewpoint    = str_dewPoint;
+      gdata.pressure    = str_pressure;
+      gdata.gas         = str_gas;      
+      gdata.tvoc        = "0";  //--- not enough data yet
+      gdata.altitude    = "-.-"; 
+    }
+
+// drawBME680Data(gdata.temperature, gdata.humidity,gdata.pressure, gdata.altitude,gdata.tvoc); 
+
+    if (r == 0) return;      //--- first reading !=0 accepted, 0 is invalid
     
     uint32_t base = bme680Abc(r, a);       // update base resistance 
     
@@ -344,38 +434,42 @@ Workaround: TouchControllerWS::getPoint()   invert Xpos for touch.
     
     resFiltered += 0.1 * (r - resFiltered);
     
-    //float ratio = (float)base / (resFiltered * a * 7.0F); // filter removed
+    //float ratio = (float)base / (resFiltered * a * 7.0F);   // filter removed
     float ratio = (float)base / (r * aF * 7.0F);
-    float tV = (1250 * log(ratio)) + 125; // approximation
+    float tV = (1250 * log(ratio)) + 125;                     // approximation
     tVoc = (tVoc == 0)?tV:tVoc + 0.1 * (tV - tVoc);
-    char str_temp[6];
-    char str_hum[6];
-    char str_absHum[6];
-    char str_dewPoint[6];
-    char str_pressure[16];
-    char str_tVoc[8];
-  
-    #ifdef USE_DISPLAY      
-      display.setTempHum(t, h);
-    #endif
-  
+        
     dtostrf(t, 4, 2, str_temp);
     dtostrf(h, 4, 2, str_hum);
     dtostrf(a, 4, 2, str_absHum);
     dtostrf(d, 4, 2, str_dewPoint);
     dtostrf(p, 3, 1, str_pressure);
-    dtostrf(tVoc, 1, 0, str_tVoc);
+    dtostrf(r, 3, 1, str_gas);
+    dtostrf(tVoc, 1, 0, str_tVoc); 
 
     serial_timestamp(); 
-    DEBUG_OUT ("Taupunkt: ");
-    DEBUG_OUT (str_dewPoint);
-    DEBUG_OUT ("  ");
-    DEBUG_OUT ("tVOC: ");
-    DEBUG_PRINT (str_tVoc);
+    DEBUG_OUT ("Taupunkt: "); DEBUG_OUT (str_dewPoint);
+    DEBUG_OUT ("  ");         
+    DEBUG_OUT ("tVOC: "); DEBUG_PRINT (str_tVoc);
+
+    gdata.temperature = str_temp;
+    gdata.humidity    = str_hum;
+    gdata.abshum      = str_absHum;
+    gdata.dewpoint    = str_dewPoint;
+    gdata.pressure    = str_pressure;
+    gdata.gas         = str_gas;
+    gdata.tvoc        = String(tVoc, 0); 
+    gdata.altitude = "0"; 
+    
+
+    serial_timestamp(); 
+    DEBUG_OUT ("Taupunkt: ");  DEBUG_OUT (str_dewPoint); DEBUG_OUT ("  ");
+    DEBUG_OUT ("tVOC: "); DEBUG_PRINT (str_tVoc);
 
     String str_press_val = String(p,2); 
 
-    drawBME680Data(str_temp, str_hum, str_press_val, "0", str_tVoc); 
+//    drawBME680Data(str_temp, str_hum, str_press_val, "0", str_tVoc); 
+//    drawBME680Data(gdata.temperature, gdata.humidity,gdata.pressure, gdata.altitude,gdata.tvoc); 
     
     //--- DEBUG
     char str_filtered[16];
@@ -383,7 +477,7 @@ Workaround: TouchControllerWS::getPoint()   invert Xpos for touch.
     char str_ratio[16];
     dtostrf(ratio, 4, 4, str_ratio);
     
-    /*
+    /* UDP Message to fhem
     snprintf(bme680Msg
            , sizeof(bme680Msg)
            , "F:THPV;T:%s;H:%s;AH:%s;D:%s;P:%s;V:%s;R:%lu;DB:%lu;DF:%s;DR:%s;"
@@ -436,6 +530,7 @@ Workaround: TouchControllerWS::getPoint()   invert Xpos for touch.
 void setup() 
 {
   DEBUG_BEGIN; //Serial.begin(115200);  
+  // wait debug console to settle 
   delay(3000);   
   DEBUG_PRINT("*** Started!");
 
@@ -453,6 +548,8 @@ void setup()
    //--- (SDA,SCL) D1, D2
    // Enable I2C for Wemos D1 mini SDA:D2 / SCL:D1 
    Wire.begin(D2, D1);
+
+   I2C_scan(); 
 
    if (!bme680.begin()) 
    {
@@ -519,6 +616,8 @@ void setup()
   
   wifiManager.setAPCallback(configModeCallback);
 
+  drawProgress(10, "Touch, to reset WiFiManager ...");
+  sleep(3000); 
   if (touchController.isTouched(1000)) 
   {
     drawProgress(10, "WiFiManager: Resetting...");
@@ -879,27 +978,24 @@ void loop()
          drawAbout();
          break;
     
-    case 5:
-          //--- indoor data screen added
-          drawIndoorData();
-        break;
-    
-    case 6: 
+    case 5:          
         { 
           unsigned long currentMillis = millis();
 
           gfx.setFont(ArialMT_Plain_10);
           gfx.setColor(MINI_WHITE);
           gfx.setTextAlignment(TEXT_ALIGN_RIGHT);  
-          gfx.drawString(228, 9, String(6) );
+          gfx.drawString(228, 9, String(5) );          
                   
           //---bme680 data screen added
           if (currentMillis - prevBme680Millis > intervalBme680) 
           {
             getBme680Readings();
           }
-        }   
-        delay(7000);    
+        }  
+        
+        drawBME680Data(gdata.temperature, gdata.humidity,gdata.pressure, gdata.altitude,gdata.tvoc);                 
+        
         break;
         
   } //--- of switch
@@ -913,6 +1009,7 @@ void loop()
       lastDownloadUpdate = millis();
   }
 
+/*
 #ifdef USE_BME680I2C
   
   if (currentMillis - prevBme680Millis > intervalBme680) {
@@ -922,6 +1019,7 @@ void loop()
     //sendMessage(bme680Msg);
   };
 #endif
+*/
 
   if (SLEEP_INTERVAL_SECS && millis() - timerPress >= SLEEP_INTERVAL_SECS * 1000)
   { // after 2 minutes go to sleep
@@ -1104,7 +1202,6 @@ void drawForecastDetail(uint16_t x, uint16_t y, uint8_t dayIndex)
   gfx.drawString(x + 25, y + 60, String(forecasts[dayIndex].rain, 1) + (IS_METRIC ? "mm" : "in"));
 }
 //-----------------------------------------------------------------------------------------
-
 void drawAstronomy() 
 {
   //--- draw moonphase and sunrise/set and moonrise/set
@@ -1333,7 +1430,7 @@ String getTime(time_t *timestamp)
   return String(buf);
 }
 //-----------------------------------------------------------------------------------------
-// additional screen draws current indoor conditions
+//--- BME280: additional screen draws current indoor conditions
 void drawIndoorData() 
 {
   //BME280 not present
@@ -1377,7 +1474,7 @@ void drawIndoorData()
   gfx.drawString(120, 271, "0") ; //change the factor in brackets depending on sea level elevation of your place, normally available in Internet
 }
 //-----------------------------------------------------------------------------------------
-// BME680-üpage:  additional screen draws current bme680-readings
+// BME680-page:  additional screen 5, draws current bme680-readings
 void drawBME680Data(String temp, String hum, String press, String alt, String tvoc ) 
 {  
   gfx.setFont(ArialRoundedMTBold_14);
@@ -1413,12 +1510,26 @@ void drawBME680Data(String temp, String hum, String press, String alt, String tv
   
   gfx.setFont(ArialRoundedMTBold_14);
   gfx.setTextAlignment(TEXT_ALIGN_LEFT);
-  gfx.setColor(MINI_WHITE);  
+    gfx.setColor(MINI_WHITE);  
   gfx.drawString(0, 249, "TVOC");
   gfx.setFont(ArialRoundedMTBold_36);  
-  gfx.setColor(MINI_YELLOW);
+  switch (gdata.tvoc.toInt()) 
+  {
+    case 0 ... 250:
+      gfx.setColor(MINI_WHITE);
+      break;
+    case  251 ... 499:
+      gfx.setColor(ILI9341_DARKGREEN);
+      break;
+    case 500 ... 999: 
+      gfx.setColor(ILI9341_ORANGE);
+      break;    
+    case 1000 ... 10000:
+      gfx.setColor(ILI9341_RED);
+    break;      
+  }  
   gfx.setTextAlignment(TEXT_ALIGN_CENTER);  
-  gfx.drawString(120, 271, tvoc) ; //change the factor in brackets depending on sea level elevation of your place, normally available in Internet
+  gfx.drawString(120, 271, tvoc + " ppm") ; //change the factor in brackets depending on sea level elevation of your place, normally available in Internet
 }
 //-----------------------------------------------------------------------------------------
 void ldr() 
